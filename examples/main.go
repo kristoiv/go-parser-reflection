@@ -48,5 +48,6 @@ func main() {
     }
 
     log.Println(model)
+    log.Println("Document.Test3[2]: ", (*documentModel.Test3)[2])
 
 }

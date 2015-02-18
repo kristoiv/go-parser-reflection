@@ -3,7 +3,7 @@ package parserreflection
 import (
     "errors"
     "strings"
-    //"log"
+    "log"
     "strconv"
     "reflect"
 )
@@ -49,6 +49,8 @@ func imprint(model *map[string]interface{}, inputModel interface{}) error {
                     return errors.New("Input model does not match the parsed document structure (document field '" + fieldName + "' as " + field.Type().String() + ")")
                 }
                 err := imprintSlice(&innerModel, field.Interface())
+                log.Println(innerModel, fieldName)
+                (*model)[fieldName] = innerModel
                 if err != nil {
                     return err
                 }
@@ -59,6 +61,7 @@ func imprint(model *map[string]interface{}, inputModel interface{}) error {
                     return errors.New("Input model does not match the parsed document structure (document field '" + fieldName + "' as " + field.Type().String() + ")")
                 }
                 err := imprint(&innerModel, field.Interface())
+                (*model)[fieldName] = innerModel
                 if err != nil {
                     return err
                 }
@@ -77,32 +80,26 @@ func imprint(model *map[string]interface{}, inputModel interface{}) error {
 func imprintSlice(slice interface{}, inputModel interface{}) error {
 
     refSlice := reflect.ValueOf(slice)
-    //log.Println(refSlice.Type().String() + ";" + refSlice.Kind().String())
     if refSlice.Kind() == reflect.Ptr {
         refSlice = refSlice.Elem()
     }
     refInputModel := reflect.ValueOf(inputModel)
-    //log.Println(refInputModel.Type().String() + ";" + refInputModel.Kind().String())
     if refInputModel.Kind() == reflect.Ptr {
         refInputModel = refInputModel.Elem()
     }
     if refSlice.Kind() != reflect.Slice {
-        return errors.New("ImprintSlice can only deal with slices1")
+        return errors.New("ImprintSlice can only deal with slices")
     }
     if refInputModel.Kind() != reflect.Slice {
-        return errors.New("ImprintSlice can only deal with slices2")
+        return errors.New("ImprintSlice can only deal with slices")
+    }
+
+    for refInputModel.Len() > refSlice.Len() && refSlice.Len() > 0 {
+        newItem := reflect.New(refSlice.Index(0).Elem().Type())
+        refSlice.Set(reflect.Append(refSlice, newItem))
     }
 
     for idx := 0; idx < refInputModel.Len(); idx++ {
-
-        if refInputModel.Len() > refSlice.Len() {
-            newSlice := reflect.MakeSlice(refSlice.Type(), refInputModel.Len(), refInputModel.Len())
-            for idx := 0; idx < refSlice.Len(); idx++ {
-                v := newSlice.Index(idx)
-                v.Set(refSlice.Index(idx))
-            }
-            refSlice = newSlice
-        }
 
         model := refSlice.Index(idx)
         innerInputModel := refInputModel.Index(idx)
@@ -113,14 +110,14 @@ func imprintSlice(slice interface{}, inputModel interface{}) error {
             case reflect.Slice:
                 value, ok := model.Interface().([]interface{})
                 if !ok {
-                    return errors.New("1Input model does not match the parsed document structure (document field index '" + strconv.Itoa(idx) + "' as " + model.Kind().String() + ")")
+                    return errors.New("Input model does not match the parsed document structure (document field index '" + strconv.Itoa(idx) + "' as " + model.Kind().String() + ")")
                 }
                 return imprintSlice(&value, innerInputModel.Interface())
 
             case reflect.Struct:
                 value, ok := model.Interface().(map[string]interface{})
                 if !ok {
-                    return errors.New("2Input model does not match the parsed document structure (document field index '" + strconv.Itoa(idx) + "' as " + model.Kind().String() + ")")
+                    return errors.New("Input model does not match the parsed document structure (document field index '" + strconv.Itoa(idx) + "' as " + model.Kind().String() + ")")
                 }
                 return imprint(&value, innerInputModel.Interface())
 
@@ -151,17 +148,4 @@ func extractFieldName(tag reflect.StructTag) string {
         return parts[0]
     }
     return yaml
-}
-
-
-func extendSlice(slice reflect.Value, newCap int) {
-    if slice.Len() > newCap {
-        panic("Cannot make a slice with a smaller CAP than the original slice was. Must increase.")
-    }
-    newSlice := reflect.MakeSlice(slice.Type(), newCap, newCap)
-    for idx := 0; idx < slice.Len(); idx++ {
-        v := newSlice.Index(idx)
-        v.Set(slice.Index(idx))
-    }
-    slice = newSlice
 }
